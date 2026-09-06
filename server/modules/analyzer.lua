@@ -398,7 +398,7 @@ local function analyseResource(resource)
     local state = GetResourceState(resource)
 
     local stats = {
-        files = 0, lines = 0, waitZero = 0, threads = 0, busyWait = 0,
+        files = 0, codeFiles = 0, lines = 0, waitZero = 0, threads = 0, busyWait = 0,
         broadcasts = 0, unsafeEvents = 0, deprecated = 0, manifest = 0,
         streamFiles = 0, streamBytes = 0, skippedFiles = 0, unreadable = 0
     }
@@ -450,7 +450,11 @@ local function analyseResource(resource)
                 isEscrowed = true
             else
                 local lines = splitLines(content)
+                local base = lowered:match('([^/]+)$')
                 stats.files = stats.files + 1
+                if base ~= 'fxmanifest.lua' and base ~= '__resource.lua' then
+                    stats.codeFiles = stats.codeFiles + 1
+                end
                 stats.lines = stats.lines + #lines
                 if ext == '.lua' then
                     analyseLua(lines, relative, sideOf(map, relative), findings, stats, deprecated)
@@ -470,7 +474,7 @@ local function analyseResource(resource)
 
     manifestFindings(resource, findings, stats, isEscrowed)
 
-    if stats.files == 0 then
+    if stats.codeFiles == 0 or (isEscrowed and stats.unreadable > 0) then
         local reason
 
         if isEscrowed then
