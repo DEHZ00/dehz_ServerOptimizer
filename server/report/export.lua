@@ -76,13 +76,20 @@ local function buildReport()
             broadcastEvents = r.stats.broadcasts,
             netEventsWithoutSource = r.stats.unsafeEvents,
             streamBytes = r.streamBytes,
-            partial = r.partial
+            partial = r.partial,
+            observed = r.observed
         }
     end
 
     local unscannable = {}
     for i = 1, #(analysis.unscannable or {}) do
-        unscannable[i] = { name = analysis.unscannable[i].name, reason = analysis.unscannable[i].reason }
+        local r = analysis.unscannable[i]
+        unscannable[i] = {
+            name = r.name,
+            reason = r.reason,
+            streamBytes = r.streamBytes,
+            observed = r.observed
+        }
     end
 
     return {
@@ -119,6 +126,7 @@ local function buildReport()
         },
         resourceAnalysis = {
             note = 'Risk scores are ESTIMATED from static code patterns. They are not measured CPU time. Nothing on a FiveM server exposes live per-resource CPU cost.',
+            observedNote = 'The observed figures on each resource - entities created, script errors, console lines, stream bytes - are measured at runtime and work on escrow-protected resources too, because escrow hides source, not behaviour.',
             streamMeasured = analysis.streamMeasured,
             totalStreamBytes = analysis.totalStreamBytes,
             ranked = topResources,
@@ -201,14 +209,24 @@ local function toText(report)
     line('  %s', report.resourceAnalysis.note)
     for i = 1, #report.resourceAnalysis.ranked do
         local r = report.resourceAnalysis.ranked[i]
-        line('  %2d. %-32s risk %-5d %d findings  %d files  %d lines%s',
-            i, r.name, r.estimatedRiskScore, r.findings, r.files, r.lines,
+        local ob = r.observed or {}
+        line('  %2d. %-30s risk %-5d %2d findings  entities %-5d errors %-3d  %s%s',
+            i, r.name, r.estimatedRiskScore, r.findings,
+            ob.entities or 0, ob.scriptErrors or 0,
+            r.streamBytes > 0 and util.formatBytes(r.streamBytes) or '-',
             r.partial and '  (manifest-only scan)' or '')
     end
     if #report.resourceAnalysis.unscannable > 0 then
-        line('  unscannable (escrow protected):')
+        line('')
+        line('  source unreadable - measured by behaviour instead:')
+        line('  %s', report.resourceAnalysis.observedNote)
         for i = 1, #report.resourceAnalysis.unscannable do
-            line('    %s', report.resourceAnalysis.unscannable[i].name)
+            local r = report.resourceAnalysis.unscannable[i]
+            local ob = r.observed or {}
+            line('    %-30s entities %-5d errors %-3d  %s', r.name,
+                ob.entities or 0, ob.scriptErrors or 0,
+                r.streamBytes > 0 and util.formatBytes(r.streamBytes) or '-')
+            line('      %s', tostring(r.reason))
         end
     end
     line('')

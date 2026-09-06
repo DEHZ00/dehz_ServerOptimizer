@@ -133,9 +133,24 @@ Related: `sv_stateBagStrictMode` (audited by Module 3) rejects client writes for
 
 Module 2 therefore ships **disabled** and requires a **second explicit opt-in** (`Config.Culling.acknowledgeDeprecated = true`) before it will run at all. The supported route to the same outcome is the `onesync_distanceCulling` and `onesync_distanceCullVehicles` convars, which the Config Auditor reports on. Use those first.
 
-### Escrowed resources cannot be analysed
+### Escrowed resources cannot be *read* — but they are still measured
 
-Escrow-protected resources are encrypted and their source cannot be read. We detect this (a `.fxap` file in the resource root, an `escrow_ignore` manifest key, or content that reads back as binary), mark the resource **`unscannable`**, and list it **separately** in the report so the ranking is not misleading. They are never scored as clean.
+Escrow encrypts **Lua, YFT, YDD and YDR** files. It does **not** encrypt `fxmanifest.lua`, YTD textures, YMAP/YBN, JavaScript, or anything listed under `escrow_ignore`. So a paid script's Lua is opaque to the analyzer, while a JS-based resource is fully readable.
+
+We detect escrow (a `.fxap` file in the resource root, an `escrow_ignore` manifest key, or content that reads back as binary), mark the resource **`unscannable`**, and list it **separately** so the risk ranking is not misleading. Escrowed resources are never scored as clean.
+
+**Escrow hides source, not behaviour.** Every unreadable resource still gets measured on four runtime signals that no amount of encryption affects:
+
+| Signal | Where it comes from |
+|---|---|
+| **Entities created** | `GetEntityScript` on every indexed entity |
+| **Script errors** | `SCRIPT ERROR` lines on that resource's console channel |
+| **Console line volume** | its `script:<name>` channel |
+| **Stream weight** | file sizes on disk — encrypted files still have a size |
+
+A resource whose code you cannot read, but which created 192 world entities and threw 31 script errors in the last hour, is a finding you can act on. That is what the **"source unreadable — measured by behaviour instead"** table shows, and the same figures appear as columns on the main ranking so escrowed and open resources sort side by side.
+
+Static analysis is one of nine modules. The other eight — sweeper, entity attribution, hitch detection and its context snapshots, config audit, state bag monitor, network monitor, reporting, exports — are unaffected by escrow entirely.
 
 ### Stream weight *is* measurable
 
@@ -169,7 +184,7 @@ If a convar in the audit table doesn't exist on your build, it is skipped silent
 These were considered and excluded. If any becomes possible on a future build we will say so rather than quietly shipping it.
 
 - **Global event interception / "event spam protection."** Each resource has its own Lua runtime, so another resource's `TriggerEvent` calls cannot be hooked from here. The state bag monitor and the static analyzer are the only real signals, and that is what we ship.
-- **Continuous per-resource CPU monitoring.** No native exposes it. The opt-in profiler is a short sample, not a monitor, and it is labelled as such. See above.
+- **Continuous per-resource CPU monitoring.** No native exposes it. The opt-in profiler is a short sample, not a monitor, and it is labelled as such. See above. (The profiler does measure escrowed resources fine — it times the runtime, not the source.)
 - **Anything claiming to raise server tick rate.** The main thread's 20 Hz timer is set by the engine.
 - **Client FPS features.** That is `Dehz_Optimizer`'s scope.
 - **Automatic convar writing by default.** `allowAutoApply` ships false, and cannot touch the three convars that matter most anyway.

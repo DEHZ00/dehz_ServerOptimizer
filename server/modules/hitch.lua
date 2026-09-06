@@ -405,6 +405,13 @@ function hitch.consoleVolume(n)
     }
 end
 
+function hitch.consoleCounts()
+    local lines, errors = {}, {}
+    for name, count in pairs(channelVolume) do lines[name] = count end
+    for name, count in pairs(scriptErrors) do errors[name] = count end
+    return lines, errors
+end
+
 function hitch.start()
     history = util.ring(Config.Hitch.historySize or 250)
     rawSamples = util.ring(1500)

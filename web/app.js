@@ -407,6 +407,10 @@
     var html = '<div class="note">' + esc(d.note)
       + ' Nothing on a FiveM server exposes live per-resource CPU cost, so this ranking is a judgement about code shape, not a measurement.</div>';
 
+    if (d.observedNote) {
+      html += '<div class="note" style="margin-top:8px;border-left-color:var(--ok)">' + esc(d.observedNote) + '</div>';
+    }
+
     if (d.progress && d.progress.running) {
       html += '<div class="note" style="margin-top:10px">Analysis running: ' + num(d.progress.current) + ' of '
         + num(d.progress.total) + ' &mdash; ' + esc(d.progress.resource || '') + '</div>';
@@ -431,13 +435,20 @@
       if (col === 'findings') return r.findingCount;
       if (col === 'lines') return r.stats.lines;
       if (col === 'stream') return r.streamBytes;
+      if (col === 'entities') return (r.observed && r.observed.entities) || 0;
+      if (col === 'errors') return (r.observed && r.observed.scriptErrors) || 0;
       return r.score;
     }).map(function (r) {
       var isOpen = expanded['res:' + r.name];
+      var ob = r.observed || { entities: 0, scriptErrors: 0, consoleLines: 0 };
       var body = '<tr class="is-clickable" data-expand="res:' + esc(r.name) + '">'
         + '<td class="mono">' + esc(r.name) + (r.partial ? ' <span class="pill pill-muted">manifest only</span>' : '')
         + (r.escrowed ? ' <span class="pill pill-muted">escrow</span>' : '') + '</td>'
         + '<td class="num">' + num(r.score) + '</td>'
+        + '<td class="num">' + num(ob.entities) + '</td>'
+        + '<td class="num">' + (ob.scriptErrors > 0
+            ? ('<span class="pill pill-critical">' + num(ob.scriptErrors) + '</span>')
+            : '0') + '</td>'
         + '<td class="num">' + num(r.findingCount) + '</td>'
         + '<td class="num">' + num(r.stats.files) + '</td>'
         + '<td class="num">' + num(r.stats.lines) + '</td>'
@@ -457,7 +468,7 @@
             + '</div>' + (f.note ? '<div class="finding-note">' + esc(f.note) + '</div>' : '') + '</div>';
         }).join('');
 
-        body += '<tr class="detail-row"><td colspan="9"><div class="detail-inner">'
+        body += '<tr class="detail-row"><td colspan="11"><div class="detail-inner">'
           + (findings || '<span class="tile-note">no findings</span>')
           + (r.findingsTruncated ? '<div class="tile-note" style="margin-top:8px">Only the first ' + num((r.findings || []).length) + ' findings are shown.</div>' : '')
           + '</div></td></tr>';
@@ -470,22 +481,34 @@
       '<div class="panel-body tight"><div class="scroll-x"><table><thead><tr>'
       + sortHeader('resources', 'name', 'resource')
       + sortHeader('resources', 'score', 'est. risk', 'num')
+      + sortHeader('resources', 'entities', 'entities', 'num')
+      + sortHeader('resources', 'errors', 'errors', 'num')
       + sortHeader('resources', 'findings', 'findings', 'num')
       + '<th class="num">files</th>'
       + sortHeader('resources', 'lines', 'lines', 'num')
       + '<th class="num">busy loops</th><th class="num">unsafe events</th><th class="num">broadcasts</th>'
       + sortHeader('resources', 'stream', 'stream', 'num')
-      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="9" style="color:var(--text-faint)">no analysis yet</td></tr>')
+      + '</tr></thead><tbody>' + (rows || '<tr><td colspan="11" style="color:var(--text-faint)">no analysis yet</td></tr>')
       + '</tbody></table></div></div>') + '</div>';
 
     var unscannable = (d.unscannable || []).map(function (r) {
-      return '<tr><td class="mono">' + esc(r.name) + '</td><td>' + esc(r.reason) + '</td>'
-        + '<td class="num">' + bytes(r.streamBytes) + '</td></tr>';
+      var ob = r.observed || { entities: 0, scriptErrors: 0, consoleLines: 0 };
+      return '<tr><td class="mono">' + esc(r.name) + '</td>'
+        + '<td class="num">' + num(ob.entities) + '</td>'
+        + '<td class="num">' + (ob.scriptErrors > 0
+            ? ('<span class="pill pill-critical">' + num(ob.scriptErrors) + '</span>')
+            : '0') + '</td>'
+        + '<td class="num">' + num(ob.consoleLines) + '</td>'
+        + '<td class="num">' + bytes(r.streamBytes) + '</td>'
+        + '<td>' + esc(r.reason) + '</td></tr>';
     }).join('');
 
-    html += '<div style="margin-top:12px">' + panel('Unscannable resources', 'listed separately so the ranking above is not misleading',
-      '<div class="panel-body tight"><div class="scroll-y"><table><thead><tr><th>resource</th><th>reason</th><th class="num">stream</th></tr></thead><tbody>'
-      + (unscannable || '<tr><td colspan="3" style="color:var(--text-faint)">none</td></tr>')
+    html += '<div style="margin-top:12px">' + panel('Source unreadable - measured by behaviour instead',
+      'escrow hides code, not what a resource does at runtime',
+      '<div class="panel-body tight"><div class="scroll-x"><table><thead><tr><th>resource</th>'
+      + '<th class="num">entities created</th><th class="num">script errors</th><th class="num">console lines</th>'
+      + '<th class="num">stream</th><th>why it could not be read</th></tr></thead><tbody>'
+      + (unscannable || '<tr><td colspan="6" style="color:var(--text-faint)">none</td></tr>')
       + '</tbody></table></div></div>') + '</div>';
 
     if (d.profiler && d.profiler.status && d.profiler.status.enabled) {

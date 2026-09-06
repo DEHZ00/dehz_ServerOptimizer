@@ -94,6 +94,7 @@ local function resourcesPayload()
             partial = r.partial,
             escrowed = r.escrowed,
             stats = r.stats,
+            observed = r.observed,
             streamBytes = r.streamBytes,
             streamFiles = r.streamFiles,
             findingCount = #r.findings,
@@ -105,6 +106,7 @@ local function resourcesPayload()
     return {
         estimateOnly = true,
         note = 'Risk scores are ESTIMATED from static code patterns. They are not measured CPU time.',
+        observedNote = 'The entities, errors and stream columns are OBSERVED behaviour, not static analysis. They work on escrow-protected resources too, because escrow hides source, not what a resource does at runtime.',
         generatedAt = report.generatedAt,
         durationMs = report.durationMs,
         streamMeasured = report.streamMeasured,

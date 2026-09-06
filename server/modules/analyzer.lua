@@ -611,7 +611,29 @@ function analyzer.run(actor)
     return report
 end
 
+local function observedLookup()
+    local entityCounts = Dehz.entities.scriptCounts()
+    local consoleLines, scriptErrors = Dehz.hitch.consoleCounts()
+
+    return function(name)
+        return {
+            entities = entityCounts[name] or 0,
+            consoleLines = consoleLines[name] or 0,
+            scriptErrors = scriptErrors[name] or 0
+        }
+    end
+end
+
 function analyzer.report()
+    local observed = observedLookup()
+
+    for i = 1, #(report.resources or {}) do
+        report.resources[i].observed = observed(report.resources[i].name)
+    end
+    for i = 1, #(report.unscannable or {}) do
+        report.unscannable[i].observed = observed(report.unscannable[i].name)
+    end
+
     return report
 end
 

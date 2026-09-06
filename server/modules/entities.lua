@@ -188,6 +188,12 @@ function entities.topScripts(n)
     end)
 end
 
+function entities.scriptCounts()
+    local out = {}
+    for name, count in pairs(scriptCounts) do out[name] = count end
+    return out
+end
+
 function entities.scanInfo()
     return {
         scanId = scanId,
