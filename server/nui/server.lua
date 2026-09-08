@@ -158,12 +158,27 @@ local builders = {
 
 local function buildPayload(tab, filters)
     local builder = builders[tab] or overviewPayload
+
     local ok, data = pcall(builder, filters)
     if not ok then
         log.error('nui', 'failed to build payload for tab "%s": %s', tostring(tab), tostring(data))
         data = {}
     end
-    return { tab = tab, meta = meta(), data = data }
+
+    local metaOk, metaData = pcall(meta)
+    if not metaOk then
+        log.error('nui', 'failed to build dashboard header: %s. A module is probably missing from this install - check the boot messages above.', tostring(metaData))
+        metaData = {
+            mode = state.mode(),
+            framework = bridge.name(),
+            health = 0,
+            players = #GetPlayers(),
+            degraded = true,
+            refreshInterval = Config.Dashboard.refreshInterval or 2000
+        }
+    end
+
+    return { tab = tab, meta = metaData, data = data }
 end
 
 local function audit(source, message, ...)
