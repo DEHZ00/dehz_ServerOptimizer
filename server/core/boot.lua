@@ -152,6 +152,7 @@ CreateThread(function()
     util.guard('boot', Dehz.network.start)
     util.guard('boot', Dehz.profiler.start)
     util.guard('boot', Dehz.nui.start)
+    util.guard('boot', Dehz.diagnose.start)
 
     log.info('boot', 'ready')
 end)

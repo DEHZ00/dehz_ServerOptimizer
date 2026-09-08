@@ -312,6 +312,21 @@ web/                        the dashboard
 
 ## Troubleshooting
 
+**Start here: type `dehz_status` in your server console.** It prints the operating mode, every capability, the state of all nine modules, why anything is still empty (with a countdown to its first run), what is in the output folders, and the dashboard access requirements. Almost every "it isn't doing anything" question is answered by that one command.
+
+**"I installed it and I see no data."** Usually one of three things:
+
+1. **You looked too early.** The modules are deliberately staggered so startup is quiet: the entity index runs at 5s, the config audit at **20s**, the resource analyzer at **45s**, and the first sweep only after the **3 minute** startup grace. `dehz_status` shows a countdown for each.
+2. **`/serveropt` appears to do nothing.** A player without permission gets **no response at all** — no error, no notification. That is deliberate, but it looks identical to a broken command. Run `add_ace group.admin dehz.optimizer allow` and make sure you are in that group. Every refused attempt is now logged to the server console with the exact `add_ace` line.
+3. **OneSync is off.** Then there is no server-side entity list, so entity counts are genuinely zero and the sweeper cannot run. The startup banner and `dehz_status` both say so plainly.
+
+**"No JSON files are being created."** That is correct behaviour, not a fault:
+
+- `reports/` is written **only** when you press **Export health report** in the dashboard, or call `exports['Dehz_ServerOptimizer']:exportHealthReport()`. Nothing is written on a timer.
+- `data/profile.json` is written **only** when the profiler runs, and the profiler ships **disabled** (`Config.Profiler.enabled = false`).
+
+If you want a report right now without opening the dashboard, run **`dehz_export`** in your server console. It writes both files and prints the paths.
+
 **"OneSync is off"** — the entity features cannot work. `set onesync on` in `server.cfg`.
 
 **Plate protection says "lookup failed"** — open `config.lua`, find `Config.FrameworkOptions`, and check the table and column names against your actual database. Current qb-core does **not** ship a `player_vehicles` table itself; it comes from qb-garages or qb-vehicleshop.
