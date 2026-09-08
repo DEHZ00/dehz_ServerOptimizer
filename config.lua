@@ -74,7 +74,7 @@ Config.FrameworkOptions = {
         },
 
         -- ESX groups treated as admin, on top of the ACE check below.
-        adminGroups = { 'admin', 'superadmin' }
+        adminGroups = { 'developer', 'owner' }
     },
 
     qb = {
@@ -150,7 +150,7 @@ Config.Dashboard = {
 
     -- How often (ms) the dashboard refreshes while it is OPEN. It costs
     -- nothing while closed. Do not set this below 1000.
-    refreshInterval = 2000
+    refreshInterval = 5000
 }
 
 -- ---------------------------------------------------------------------
@@ -730,7 +730,7 @@ Config.Network = {
 --  Everything here is deliberately conservative.
 -- ---------------------------------------------------------------------
 Config.Profiler = {
-    enabled = false,
+    enabled = true,
 
     -- How many server frames to record when no number is given.
     -- 60 frames at 20 ticks per second is 3 seconds.
