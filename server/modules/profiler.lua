@@ -15,15 +15,40 @@ local function acePrincipal()
     return 'resource.' .. GetCurrentResourceName()
 end
 
+local REQUIRED_COMMANDS = { 'profiler', 'record', 'saveJSON' }
+
+local function missingAces()
+    if type(IsPrincipalAceAllowed) ~= 'function' then return {} end
+
+    local principal = acePrincipal()
+    local missing = {}
+
+    for i = 1, #REQUIRED_COMMANDS do
+        local object = 'command.' .. REQUIRED_COMMANDS[i]
+        local ok, allowed = pcall(IsPrincipalAceAllowed, principal, object)
+        if ok and allowed ~= true then
+            missing[#missing + 1] = object
+        end
+    end
+
+    return missing
+end
+
+local function aceLines()
+    local principal = acePrincipal()
+    local lines = {}
+    for i = 1, #REQUIRED_COMMANDS do
+        lines[#lines + 1] = ('add_ace %s command.%s allow'):format(principal, REQUIRED_COMMANDS[i])
+    end
+    return lines
+end
+
 local function aceLine()
-    return ('add_ace %s command.profiler allow'):format(acePrincipal())
+    return table.concat(aceLines(), '  |  ')
 end
 
 local function hasProfilerAce()
-    if type(IsPrincipalAceAllowed) ~= 'function' then return true end
-    local ok, allowed = pcall(IsPrincipalAceAllowed, acePrincipal(), 'command.profiler')
-    if not ok then return true end
-    return allowed == true
+    return #missingAces() == 0
 end
 
 local function outputPath()
@@ -53,8 +78,10 @@ local function canRun()
 
     if not outputPath() then return false, 'could not resolve this resource path' end
 
-    if not hasProfilerAce() then
-        return false, ('the server denies this resource the "profiler" console command. Add this to server.cfg and restart:  %s'):format(aceLine())
+    local missing = missingAces()
+    if #missing > 0 then
+        return false, ('the server denies this resource %d console command(s) it needs (%s). Add these to server.cfg and restart:  %s')
+            :format(#missing, table.concat(missing, ', '), aceLine())
     end
 
     return true
@@ -196,14 +223,16 @@ local function execute(frames, actor)
     Wait(recordWaitMs)
 
     stage = 'saving'
-    ExecuteCommand(('profiler saveJSON %s'):format(path))
+    ExecuteCommand(('profiler saveJSON "%s"'):format(path))
     Wait(3000)
 
     stage = 'reading'
     local content, err, size = readRecording(path)
     if not content then
-        if not hasProfilerAce() then
-            err = ('the server denied this resource the "profiler" console command, so nothing was recorded. Add this to server.cfg and restart:  %s'):format(aceLine())
+        local stillMissing = missingAces()
+        if #stillMissing > 0 then
+            err = ('the server denied this resource %s, so nothing was recorded. Add these to server.cfg and restart:  %s')
+                :format(table.concat(stillMissing, ' and '), aceLine())
         elseif err == 'could not open the recording file' then
             err = ('no recording file was produced at %s. The most common cause is the server denying this resource the "profiler" console command - look for "Access denied for command profiler" above. Fix with:  %s')
                 :format(path, aceLine())
@@ -270,6 +299,14 @@ function profiler.run(frames, actor, onDone)
         stage = 'idle'
         running = false
 
+        if not result then
+            local retryIn = 15000
+            local cooldown = Config.Profiler.cooldown or 300000
+            if cooldown > retryIn then
+                lastRunAt = GetGameTimer() - (cooldown - retryIn)
+            end
+        end
+
         if onDone then
             util.guard('profiler', onDone, result, lastError)
         end
@@ -286,7 +323,8 @@ function profiler.status()
     return {
         enabled = Config.Profiler.enabled == true,
         aceGranted = hasProfilerAce(),
-        aceLine = aceLine(),
+        aceMissing = missingAces(),
+        aceLines = aceLines(),
         running = running,
         stage = stage,
         lastRunAt = lastRunAt,
@@ -306,9 +344,13 @@ function profiler.start()
 
     log.warn('profiler', 'the optional profiler module is ENABLED. It is never automatic - it only runs when an admin asks for it - but while it records, the server does extra work for every resource tick and event.')
 
-    if not hasProfilerAce() then
-        log.error('profiler', 'the profiler cannot run: this server denies the resource the "profiler" console command. Add this line to server.cfg and restart, or the profiler will fail every time:')
-        log.error('profiler', '    %s', aceLine())
+    local missing = missingAces()
+    if #missing > 0 then
+        log.error('profiler', 'the profiler cannot run: this server denies the resource %d console command(s) it needs. Add these lines to server.cfg and restart, or every run will fail:', #missing)
+        local lines = aceLines()
+        for i = 1, #lines do
+            log.error('profiler', '    %s', lines[i])
+        end
     end
 end
 

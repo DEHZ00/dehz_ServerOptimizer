@@ -735,9 +735,15 @@ Config.Network = {
 --  using your actual resource folder name, and restart:
 --
 --      add_ace resource.dehz_ServerOptimizer command.profiler allow
+--      add_ace resource.dehz_ServerOptimizer command.record allow
+--      add_ace resource.dehz_ServerOptimizer command.saveJSON allow
 --
---  Without it every profile run fails with "Access denied for command
---  profiler". The resource checks this at startup and tells you.
+--  All THREE are needed. "profiler" is the outer command; "record" and
+--  "saveJSON" are its sub-commands, and the server permission check runs
+--  on each of them separately.
+--
+--  Without them a run fails with "Access denied for command record". The
+--  resource checks all three at startup and prints the exact lines.
 -- ---------------------------------------------------------------------
 Config.Profiler = {
     enabled = true,

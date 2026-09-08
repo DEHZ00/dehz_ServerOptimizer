@@ -153,8 +153,11 @@ function diagnose.report()
     if not prof.enabled then
         line('  profiler    disabled in config')
     elseif prof.aceGranted == false then
-        line('  profiler    ENABLED BUT BLOCKED - the server denies this resource the "profiler" console command')
-        line('              add to server.cfg and restart:  %s', tostring(prof.aceLine))
+        line('  profiler    ENABLED BUT BLOCKED - missing %d console command ACE(s): %s',
+            #prof.aceMissing, table.concat(prof.aceMissing, ', '))
+        for i = 1, #prof.aceLines do
+            line('              %s', prof.aceLines[i])
+        end
     else
         line('  profiler    %s', prof.running and ('running: ' .. prof.stage) or 'enabled, idle')
     end

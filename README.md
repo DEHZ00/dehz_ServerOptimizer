@@ -330,9 +330,13 @@ It works by driving FXServer's own `profiler` console command, and the server re
 
 ```
 add_ace resource.dehz_ServerOptimizer command.profiler allow
+add_ace resource.dehz_ServerOptimizer command.record allow
+add_ace resource.dehz_ServerOptimizer command.saveJSON allow
 ```
 
-Without it you get `Access denied for command profiler` and every run fails. The resource checks the ACE at startup, refuses to start a doomed run, and `dehz_status` reports it as **ENABLED BUT BLOCKED** with the exact line to add.
+**All three are required.** `profiler` is the outer command; `record` and `saveJSON` are sub-commands inside its own console context, and FXServer runs `seCheckPrivilege("command.<name>")` on each one separately (`Console.Commands.cpp:114`). Granting only `command.profiler` gets you `Access denied for command record`.
+
+The resource checks all three at startup, refuses to start a run that cannot work, names which are missing, and `dehz_status` reports **ENABLED BUT BLOCKED** with the exact lines. A failed run only costs a 15 second retry wait rather than the full cooldown.
 
 ## Troubleshooting
 
