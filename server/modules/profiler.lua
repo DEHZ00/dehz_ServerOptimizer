@@ -11,6 +11,21 @@ local lastResult = nil
 local lastError = nil
 local stage = 'idle'
 
+local function acePrincipal()
+    return 'resource.' .. GetCurrentResourceName()
+end
+
+local function aceLine()
+    return ('add_ace %s command.profiler allow'):format(acePrincipal())
+end
+
+local function hasProfilerAce()
+    if type(IsPrincipalAceAllowed) ~= 'function' then return true end
+    local ok, allowed = pcall(IsPrincipalAceAllowed, acePrincipal(), 'command.profiler')
+    if not ok then return true end
+    return allowed == true
+end
+
 local function outputPath()
     local root = GetResourcePath(GetCurrentResourceName())
     if not root or root == '' then return nil end
@@ -37,6 +52,10 @@ local function canRun()
     if state.sweepRunning then return false, 'an entity sweep is running' end
 
     if not outputPath() then return false, 'could not resolve this resource path' end
+
+    if not hasProfilerAce() then
+        return false, ('the server denies this resource the "profiler" console command. Add this to server.cfg and restart:  %s'):format(aceLine())
+    end
 
     return true
 end
@@ -183,6 +202,12 @@ local function execute(frames, actor)
     stage = 'reading'
     local content, err, size = readRecording(path)
     if not content then
+        if not hasProfilerAce() then
+            err = ('the server denied this resource the "profiler" console command, so nothing was recorded. Add this to server.cfg and restart:  %s'):format(aceLine())
+        elseif err == 'could not open the recording file' then
+            err = ('no recording file was produced at %s. The most common cause is the server denying this resource the "profiler" console command - look for "Access denied for command profiler" above. Fix with:  %s')
+                :format(path, aceLine())
+        end
         lastError = err
         log.warn('profiler', 'profile failed: %s', tostring(err))
         return nil
@@ -253,9 +278,15 @@ function profiler.run(frames, actor, onDone)
     return true, ('recording %d frames'):format(frames)
 end
 
+function profiler.aceStatus()
+    return { granted = hasProfilerAce(), principal = acePrincipal(), line = aceLine() }
+end
+
 function profiler.status()
     return {
         enabled = Config.Profiler.enabled == true,
+        aceGranted = hasProfilerAce(),
+        aceLine = aceLine(),
         running = running,
         stage = stage,
         lastRunAt = lastRunAt,
@@ -271,8 +302,13 @@ function profiler.report()
 end
 
 function profiler.start()
-    if Config.Profiler.enabled then
-        log.warn('profiler', 'the optional profiler module is ENABLED. It is never automatic - it only runs when an admin asks for it - but while it records, the server does extra work for every resource tick and event.')
+    if not Config.Profiler.enabled then return end
+
+    log.warn('profiler', 'the optional profiler module is ENABLED. It is never automatic - it only runs when an admin asks for it - but while it records, the server does extra work for every resource tick and event.')
+
+    if not hasProfilerAce() then
+        log.error('profiler', 'the profiler cannot run: this server denies the resource the "profiler" console command. Add this line to server.cfg and restart, or the profiler will fail every time:')
+        log.error('profiler', '    %s', aceLine())
     end
 end
 

@@ -316,13 +316,23 @@ web/                        the dashboard
 |---|---|---|---|
 | `dehz_status` | yes | yes (floods chat) | Mode, capabilities, every module's state with a countdown to its first run, output folders, dashboard access |
 | `dehz_export` | yes | yes | Writes a health report to `reports/` now — JSON and text |
-| `dehz_profile [frames]` | yes | yes | Runs the profiler and prints **measured** per-resource milliseconds. Requires `Config.Profiler.enabled` |
+| `dehz_profile [frames]` | yes | yes | Runs the profiler and prints **measured** per-resource milliseconds. Needs `Config.Profiler.enabled` **and** the ACE below |
 | `serveropt` | no | yes | Opens the dashboard. Name is `Config.Dashboard.command` |
 | `dehz_optimizer_open` | no | yes | Same, and the keybind target |
 
 All are admin-gated by the `dehz.optimizer` ACE; the server console always counts as admin. A player without it gets **no response at all**, by design — the refusal is logged server-side with the `add_ace` line.
 
 Note that `dehz_export` includes the profiler's **last** result if one exists, but does not run it. Run `dehz_profile` first if you want measured timings in the report.
+
+### The profiler needs one extra ACE
+
+It works by driving FXServer's own `profiler` console command, and the server refuses that command to resources by default. Add this to `server.cfg` with your actual resource folder name, then restart:
+
+```
+add_ace resource.dehz_ServerOptimizer command.profiler allow
+```
+
+Without it you get `Access denied for command profiler` and every run fails. The resource checks the ACE at startup, refuses to start a doomed run, and `dehz_status` reports it as **ENABLED BUT BLOCKED** with the exact line to add.
 
 ## Troubleshooting
 
