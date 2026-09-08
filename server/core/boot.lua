@@ -4,6 +4,22 @@ local util = Dehz.util
 local state = Dehz.state
 local caps = Dehz.caps
 
+local MODULES = {
+    { key = 'bridge',    fn = 'start', file = 'server/bridge/framework.lua' },
+    { key = 'persist',   fn = 'init',  file = 'server/report/persist.lua' },
+    { key = 'entities',  fn = 'start', file = 'server/modules/entities.lua' },
+    { key = 'sweeper',   fn = 'start', file = 'server/modules/sweeper.lua' },
+    { key = 'culling',   fn = 'start', file = 'server/modules/culling.lua' },
+    { key = 'auditor',   fn = 'start', file = 'server/modules/auditor.lua' },
+    { key = 'hitch',     fn = 'start', file = 'server/modules/hitch.lua' },
+    { key = 'analyzer',  fn = 'start', file = 'server/modules/analyzer.lua' },
+    { key = 'statebags', fn = 'start', file = 'server/modules/statebags.lua' },
+    { key = 'network',   fn = 'start', file = 'server/modules/network.lua' },
+    { key = 'profiler',  fn = 'start', file = 'server/modules/profiler.lua' },
+    { key = 'nui',       fn = 'start', file = 'server/nui/server.lua' },
+    { key = 'diagnose',  fn = 'start', file = 'server/core/diagnose.lua' }
+}
+
 local function ensure(parent, key, fallback)
     if type(parent[key]) ~= 'table' then
         parent[key] = fallback
@@ -140,21 +156,41 @@ CreateThread(function()
     log.info('boot', 'operating mode: %s%s', state.mode(),
         state.mode() == 'monitor' and ' (nothing will be deleted or changed)' or ' (destructive modules may act, subject to their own dry-run switches)')
 
-    util.guard('boot', Dehz.bridge.start)
-    util.guard('boot', Dehz.persist.init)
-    util.guard('boot', Dehz.entities.start)
-    util.guard('boot', Dehz.sweeper.start)
-    util.guard('boot', Dehz.culling.start)
-    util.guard('boot', Dehz.auditor.start)
-    util.guard('boot', Dehz.hitch.start)
-    util.guard('boot', Dehz.analyzer.start)
-    util.guard('boot', Dehz.statebags.start)
-    util.guard('boot', Dehz.network.start)
-    util.guard('boot', Dehz.profiler.start)
-    util.guard('boot', Dehz.nui.start)
-    util.guard('boot', Dehz.diagnose.start)
+    local missing = {}
+    local failed = {}
 
-    log.info('boot', 'ready')
+    for i = 1, #MODULES do
+        local entry = MODULES[i]
+        local module = Dehz[entry.key]
+
+        if type(module) ~= 'table' or type(module[entry.fn]) ~= 'function' then
+            missing[#missing + 1] = entry
+        else
+            local ok, err = pcall(module[entry.fn])
+            if not ok then
+                failed[#failed + 1] = { entry = entry, err = tostring(err) }
+            end
+        end
+    end
+
+    for i = 1, #failed do
+        log.error('boot', 'module "%s" failed to start: %s', failed[i].entry.key, failed[i].err)
+    end
+
+    if #missing > 0 then
+        local files = {}
+        for i = 1, #missing do files[#files + 1] = missing[i].file end
+
+        log.error('boot', '%d module(s) did not load, so those features are OFF. Missing file(s): %s',
+            #missing, table.concat(files, ', '))
+        log.error('boot', 'This is almost always an incomplete copy. Scroll up for a "could not find server_script" warning, then re-upload the whole resource folder rather than only the files you think changed.')
+    end
+
+    if #missing == 0 and #failed == 0 then
+        log.info('boot', 'ready')
+    else
+        log.warn('boot', 'ready, with %d module(s) unavailable', #missing + #failed)
+    end
 end)
 
 AddEventHandler('onResourceStop', function(resource)
