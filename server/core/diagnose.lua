@@ -198,17 +198,23 @@ function diagnose.start()
 
         if source == 0 then
             log.banner(lines)
-        else
-            for i = 1, #lines do
-                TriggerClientEvent('chat:addMessage', source, { color = { 200, 16, 46 }, multiline = true, args = { 'Optimizer', lines[i] } })
-            end
+            return
         end
+
+        for i = 1, #lines do
+            TriggerClientEvent('chat:addMessage', source, { color = { 200, 16, 46 }, multiline = true, args = { 'Optimizer', lines[i] } })
+        end
+        Dehz.bridge.notify(source, 'Status printed to chat. The server console version is easier to read.', 'inform')
     end, false)
 
     RegisterCommand('dehz_export', function(source)
         if source ~= 0 and not Dehz.bridge.isAdmin(source) then return end
 
         local actor = source == 0 and 'server console' or Dehz.bridge.getPlayerLabel(source)
+
+        if source ~= 0 then
+            Dehz.bridge.notify(source, 'Building health report...', 'inform')
+        end
 
         util.thread('diagnose', function()
             local written, err = Dehz.export.write(actor)
@@ -220,8 +226,14 @@ function diagnose.start()
                     '  ' .. written.json,
                     ''
                 })
+                if source ~= 0 then
+                    Dehz.bridge.notify(source, 'Health report written to ' .. written.text, 'success')
+                end
             else
                 log.warn('diagnose', 'export failed: %s', tostring(err))
+                if source ~= 0 then
+                    Dehz.bridge.notify(source, 'Health report failed: ' .. tostring(err), 'error')
+                end
             end
         end)
     end, false)
