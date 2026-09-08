@@ -32,6 +32,7 @@ server_scripts {
     'server/report/export.lua',
     'server/api/exports.lua',
     'server/nui/server.lua',
+    'server/core/diagnose.lua',
     'server/core/boot.lua'
 }
 

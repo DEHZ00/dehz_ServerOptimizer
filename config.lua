@@ -74,7 +74,7 @@ Config.FrameworkOptions = {
         },
 
         -- ESX groups treated as admin, on top of the ACE check below.
-        adminGroups = { 'admin', 'superadmin' }
+        adminGroups = { 'developer', 'owner' }
     },
 
     qb = {
@@ -150,7 +150,7 @@ Config.Dashboard = {
 
     -- How often (ms) the dashboard refreshes while it is OPEN. It costs
     -- nothing while closed. Do not set this below 1000.
-    refreshInterval = 2000
+    refreshInterval = 5000
 }
 
 -- ---------------------------------------------------------------------
@@ -465,9 +465,17 @@ Config.Auditor = {
     -- server.cfg has definitely finished executing.
     startDelay = 20000,
 
-    -- Re-run the audit automatically when a convar changes at runtime.
-    -- This is event driven and costs nothing while nothing changes.
+    -- Re-run the audit automatically when one of the convars it actually
+    -- audits changes at runtime. Changes to any other convar on your
+    -- server are ignored. This is event driven and costs nothing while
+    -- nothing changes.
     reactToConvarChanges = true,
+
+    -- Minimum gap (ms) between automatic re-runs. Busy servers change
+    -- convars constantly; without this the audit would re-run every few
+    -- seconds. A re-run whose findings are identical to the last one is
+    -- logged at debug level only, so your console stays quiet.
+    minRerunInterval = 60000,
 
     -- DANGER. Allows the auditor to apply recommended values itself.
     -- Ships false and should stay false.
@@ -586,10 +594,17 @@ Config.Analyzer = {
     -- during boot is exactly the wrong moment to do it.
     startDelay = 45000,
 
-    -- How many files to read per server frame. Keep this low. The scan
+    -- How many SCRIPT files to read per server frame. Keep this low -
+    -- reading and scanning a Lua file is the expensive part, and the scan
     -- is slow on purpose so it never becomes the problem it is looking
     -- for.
     filesPerTick = 3,
+
+    -- How many STREAM files to measure per server frame. These are far
+    -- cheaper than script files - we only read the file size, never the
+    -- contents - so this can be much higher. Without a separate budget a
+    -- server with a lot of MLOs would take an hour to finish scanning.
+    streamFilesPerTick = 250,
 
     -- Skip files larger than this many bytes. Minified bundles and
     -- generated data files produce noise, not findings.
@@ -715,7 +730,7 @@ Config.Network = {
 --  Everything here is deliberately conservative.
 -- ---------------------------------------------------------------------
 Config.Profiler = {
-    enabled = false,
+    enabled = true,
 
     -- How many server frames to record when no number is given.
     -- 60 frames at 20 ticks per second is 3 seconds.

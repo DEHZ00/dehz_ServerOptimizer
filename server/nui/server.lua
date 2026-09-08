@@ -181,7 +181,11 @@ end)
 RegisterNetEvent('dehz_so:request:open', function()
     local source = source
     if not Config.Dashboard.enabled then return end
-    if not bridge.isAdmin(source) then return end
+    if not bridge.isAdmin(source) then
+        log.info('nui', 'dashboard request from %s was refused: no "%s" ACE. The player got no response, by design. Grant access with: add_ace group.admin %s allow',
+            bridge.getPlayerLabel(source), Config.Permissions.ace, Config.Permissions.ace)
+        return
+    end
     if throttled(source) then return end
 
     log.info('nui', 'dashboard opened by %s', bridge.getPlayerLabel(source))
@@ -300,7 +304,11 @@ function nui.start()
             log.info('nui', 'the dashboard is an in-game interface and cannot be opened from the server console. Use the exports or the exported health report instead.')
             return
         end
-        if not bridge.isAdmin(source) then return end
+        if not bridge.isAdmin(source) then
+            log.info('nui', '/%s from %s was refused: no "%s" ACE. The player got no response, by design. Grant access with: add_ace group.admin %s allow',
+                Config.Dashboard.command or 'serveropt', bridge.getPlayerLabel(source), Config.Permissions.ace, Config.Permissions.ace)
+            return
+        end
         TriggerClientEvent('dehz_so:client:open', source, buildPayload('overview'))
     end, false)
 
