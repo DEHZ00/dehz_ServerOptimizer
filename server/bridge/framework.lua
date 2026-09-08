@@ -11,6 +11,7 @@ local plateSet = {}
 local plateCount = 0
 local manualPlates = {}
 local plateFetchedAt = 0
+local lastRefreshCount = -1
 
 local IDENTIFIER_PATTERN = '^[A-Za-z0-9_]+$'
 
@@ -77,10 +78,27 @@ local function baseLabel(source)
     return ('%s [%s]'):format(name, license)
 end
 
+local warnedAbsent = {}
+
+local function columnExists(tableName, columnName)
+    local rows, err = dbQuery(
+        'SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+        { tableName, columnName }, 10000)
+
+    if not rows then return nil, err end
+
+    local row = rows[1]
+    if not row then return false end
+
+    local count = tonumber(row.n) or 0
+    return count > 0
+end
+
 local function fetchPlatesFrom(entries)
     local collected = {}
     local allOk = true
     local lastError
+    local absent = 0
 
     for i = 1, #entries do
         local entry = entries[i]
@@ -93,27 +111,44 @@ local function fetchPlatesFrom(entries)
                 :format(tostring(entry.table), tostring(entry.column))
             log.error('bridge', 'owned-vehicle lookup skipped: %s', lastError)
         else
-            local sql = ('SELECT `%s` AS plate FROM `%s` WHERE `%s` IS NOT NULL AND `%s` <> \'\'')
-                :format(columnName, tableName, columnName, columnName)
+            local key = tableName .. '.' .. columnName
+            local exists, checkError = columnExists(tableName, columnName)
 
-            local rows, err = dbQuery(sql)
-
-            if not rows then
+            if exists == nil then
                 allOk = false
-                lastError = err
-                log.warn('bridge', 'owned-vehicle plate lookup failed for table `%s` column `%s`: %s',
-                    tableName, columnName, tostring(err))
-            else
-                for j = 1, #rows do
-                    local plate = util.normalisePlate(rows[j].plate)
-                    if plate then collected[plate] = true end
+                lastError = checkError
+                log.warn('bridge', 'could not check whether `%s`.`%s` exists: %s. Treating the plate lookup as failed.',
+                    tableName, columnName, tostring(checkError))
+            elseif exists == false then
+                absent = absent + 1
+                if not warnedAbsent[key] then
+                    warnedAbsent[key] = true
+                    log.warn('bridge', '`%s`.`%s` does not exist in this database, so it is being skipped. This is a config mismatch, not a database failure - remove that entry from Config.FrameworkOptions.%s.vehicleTables to silence this.',
+                        tableName, columnName, bridge.name())
                 end
-                log.debug('bridge', 'loaded %d plates from `%s`.`%s`', #rows, tableName, columnName)
+            else
+                local sql = ('SELECT `%s` AS plate FROM `%s` WHERE `%s` IS NOT NULL AND `%s` <> \'\'')
+                    :format(columnName, tableName, columnName, columnName)
+
+                local rows, err = dbQuery(sql)
+
+                if not rows then
+                    allOk = false
+                    lastError = err
+                    log.warn('bridge', 'owned-vehicle plate lookup failed for `%s`.`%s`: %s. The table exists, so this is a real database problem - check the oxmysql error printed above this line.',
+                        tableName, columnName, tostring(err))
+                else
+                    for j = 1, #rows do
+                        local plate = util.normalisePlate(rows[j].plate)
+                        if plate then collected[plate] = true end
+                    end
+                    log.debug('bridge', 'loaded %d plates from `%s`.`%s`', #rows, tableName, columnName)
+                end
             end
         end
     end
 
-    return collected, allOk, lastError
+    return collected, allOk, lastError, absent
 end
 
 local standalone = {
@@ -333,7 +368,7 @@ end
 function bridge.refreshPlates()
     if not impl then return false end
 
-    local collected, allOk, lastError = impl.fetchPlates()
+    local collected, allOk, lastError, absent = impl.fetchPlates()
 
     local extra = Config.FrameworkOptions.alwaysProtectedPlates or {}
     for i = 1, #extra do
@@ -355,10 +390,17 @@ function bridge.refreshPlates()
     if impl.name == 'standalone' then
         log.debug('bridge', 'standalone: no owned-vehicle plates to protect (%d manual entries)', plateCount)
     elseif allOk then
-        log.info('bridge', 'protected plate cache refreshed: %d plates', plateCount)
+        if lastRefreshCount ~= plateCount then
+            log.info('bridge', 'protected plate cache: %d plates%s', plateCount,
+                (absent or 0) > 0 and (', ' .. absent .. ' configured table(s) not present in this database and skipped') or '')
+        else
+            log.debug('bridge', 'protected plate cache refreshed: %d plates', plateCount)
+        end
     else
-        log.warn('bridge', 'protected plate cache refreshed with errors: %d plates loaded, last error: %s', plateCount, tostring(lastError))
+        log.warn('bridge', 'protected plate cache refreshed WITH ERRORS: %d plates loaded, last error: %s', plateCount, tostring(lastError))
     end
+
+    lastRefreshCount = plateCount
 
     return allOk
 end

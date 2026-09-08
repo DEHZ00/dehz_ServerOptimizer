@@ -425,8 +425,9 @@ local function analyseResource(resource)
     end
 
     local maxSize = cfg().maxFileSize or 524288
-    local perTick = cfg().filesPerTick or 3
-    local processed = 0
+    local scriptBudget = cfg().filesPerTick or 3
+    local streamBudget = cfg().streamFilesPerTick or 250
+    local scriptsThisTick, streamThisTick = 0, 0
 
     for i = 1, #files do
         local relative = files[i]
@@ -438,7 +439,9 @@ local function analyseResource(resource)
             if path ~= '' then
                 stats.streamBytes = stats.streamBytes + fileSize(path .. '/' .. relative)
             end
+            streamThisTick = streamThisTick + 1
         elseif ext and patterns.scanExtensions[ext] then
+            scriptsThisTick = scriptsThisTick + 1
             local content = LoadResourceFile(resource, relative)
 
             if type(content) ~= 'string' or content == '' then
@@ -465,9 +468,8 @@ local function analyseResource(resource)
             content = nil
         end
 
-        processed = processed + 1
-        if processed >= perTick then
-            processed = 0
+        if scriptsThisTick >= scriptBudget or streamThisTick >= streamBudget then
+            scriptsThisTick, streamThisTick = 0, 0
             Wait(0)
         end
     end
@@ -540,9 +542,18 @@ function analyzer.run(actor)
     local unscannable = {}
     local partial = false
 
+    log.info('analyzer', 'scanning %d resources. This is deliberately slow so it never becomes the problem it is looking for - expect it to take a few minutes on a large server.', #names)
+
+    local lastProgressAt = GetGameTimer()
+
     for i = 1, #names do
         progress.current = i
         progress.resource = names[i]
+
+        if GetGameTimer() - lastProgressAt >= 20000 then
+            lastProgressAt = GetGameTimer()
+            log.info('analyzer', 'progress: %d of %d resources (%s)', i, #names, names[i])
+        end
 
         local ok, result = pcall(analyseResource, names[i])
         if ok and result then

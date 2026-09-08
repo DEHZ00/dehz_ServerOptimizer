@@ -13,6 +13,8 @@ local missing = {}
 local lastRunAt = 0
 local applied = {}
 local pendingRerun = false
+local lastFingerprint = nil
+local lastRerunAt = 0
 
 local function readConvar(key)
     local value = GetConvar(key, SENTINEL)
@@ -210,10 +212,23 @@ function auditor.run(actor)
         elseif findings[i].severity == 'warning' then warning = warning + 1 end
     end
 
-    log.info('auditor', 'config audit complete: %d critical, %d warning, %d total findings (%d convars not present on this build were skipped)',
-        critical, warning, #findings, #missing)
+    local fingerprint = {}
+    for i = 1, #findings do
+        fingerprint[#fingerprint + 1] = findings[i].key .. '=' .. tostring(findings[i].current)
+    end
+    fingerprint = table.concat(fingerprint, ';')
 
-    if critical > 0 then
+    local changed = fingerprint ~= lastFingerprint
+    lastFingerprint = fingerprint
+
+    if changed then
+        log.info('auditor', 'config audit: %d critical, %d warning, %d total findings (%d convars not present on this build were skipped)',
+            critical, warning, #findings, #missing)
+    else
+        log.debug('auditor', 'config audit re-ran, findings unchanged')
+    end
+
+    if critical > 0 and changed then
         local fields = {}
         for i = 1, math.min(#findings, 8) do
             local f = findings[i]
@@ -274,15 +289,30 @@ function auditor.start()
     end)
 
     if Config.Auditor.reactToConvarChanges and caps.convarListener then
-        AddConvarChangeListener(nil, function()
+        local entries = Dehz.data.convars
+        local registered = 0
+
+        local function onChange()
             if pendingRerun then return end
+
+            local minGap = Config.Auditor.minRerunInterval or 60000
+            local since = GetGameTimer() - lastRerunAt
+            local delay = math.max(5000, minGap - since)
+
             pendingRerun = true
-            SetTimeout(5000, function()
+            SetTimeout(delay, function()
+                lastRerunAt = GetGameTimer()
                 pendingRerun = false
                 util.guard('auditor', auditor.run, 'convar-change')
             end)
-        end)
-        log.debug('auditor', 'listening for convar changes')
+        end
+
+        for i = 1, #entries do
+            local ok = pcall(AddConvarChangeListener, entries[i].key, onChange)
+            if ok then registered = registered + 1 end
+        end
+
+        log.debug('auditor', 'listening for changes on %d audited convars (a change elsewhere on the server is ignored)', registered)
     elseif Config.Auditor.reactToConvarChanges then
         log.debug('auditor', 'AddConvarChangeListener is not available on this build; audit runs at start and on demand only')
     end

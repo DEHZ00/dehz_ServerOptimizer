@@ -329,6 +329,10 @@ If you want a report right now without opening the dashboard, run **`dehz_export
 
 **"OneSync is off"** — the entity features cannot work. `set onesync on` in `server.cfg`.
 
+**"`table.column` does not exist in this database"** — a configured owned-vehicle table isn't on your schema. ESX Legacy's own SQL ships `rented_vehicles`, but plenty of servers never import it. This is treated as a **config mismatch, not a database failure**: the table is skipped, the warning is printed once, and it does **not** block live sweeping. Remove the entry from `Config.FrameworkOptions.<framework>.vehicleTables` to silence it. A table that *does* exist but errors is a different matter — that marks the lookup failed and will block live sweeps while `requirePlateLookup` is true.
+
+**"The resource analyzer never finishes."** On a large server it genuinely takes minutes — it reads every script file and sizes every stream asset, deliberately slowly. It logs a progress line every 20 seconds so you can see it moving. If it is too slow for you, raise `Config.Analyzer.streamFilesPerTick` first (cheap), then `filesPerTick` (expensive).
+
 **Plate protection says "lookup failed"** — open `config.lua`, find `Config.FrameworkOptions`, and check the table and column names against your actual database. Current qb-core does **not** ship a `player_vehicles` table itself; it comes from qb-garages or qb-vehicleshop.
 
 **A sweep hit the cap** — `maxDeletionsPerSweep` exists to catch a misconfiguration. Hitting it almost always means a category rule is too loose, not that your server is that dirty. Read the dry-run output before raising it.
