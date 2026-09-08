@@ -221,7 +221,7 @@ local function execute(frames, actor)
     return result
 end
 
-function profiler.run(frames, actor)
+function profiler.run(frames, actor, onDone)
     local allowed, reason = canRun()
     if not allowed then
         lastError = reason
@@ -244,6 +244,10 @@ function profiler.run(frames, actor)
         end
         stage = 'idle'
         running = false
+
+        if onDone then
+            util.guard('profiler', onDone, result, lastError)
+        end
     end)
 
     return true, ('recording %d frames'):format(frames)

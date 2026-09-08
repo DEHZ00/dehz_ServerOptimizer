@@ -310,6 +310,20 @@ client/nui.lua              NUI bridge only - there is no other client code
 web/                        the dashboard
 ```
 
+## Console commands
+
+| Command | Console | In game | What it does |
+|---|---|---|---|
+| `dehz_status` | yes | yes (floods chat) | Mode, capabilities, every module's state with a countdown to its first run, output folders, dashboard access |
+| `dehz_export` | yes | yes | Writes a health report to `reports/` now — JSON and text |
+| `dehz_profile [frames]` | yes | yes | Runs the profiler and prints **measured** per-resource milliseconds. Requires `Config.Profiler.enabled` |
+| `serveropt` | no | yes | Opens the dashboard. Name is `Config.Dashboard.command` |
+| `dehz_optimizer_open` | no | yes | Same, and the keybind target |
+
+All are admin-gated by the `dehz.optimizer` ACE; the server console always counts as admin. A player without it gets **no response at all**, by design — the refusal is logged server-side with the `add_ace` line.
+
+Note that `dehz_export` includes the profiler's **last** result if one exists, but does not run it. Run `dehz_profile` first if you want measured timings in the report.
+
 ## Troubleshooting
 
 **Start here: type `dehz_status` in your server console.** It prints the operating mode, every capability, the state of all nine modules, why anything is still empty (with a countdown to its first run), what is in the output folders, and the dashboard access requirements. Almost every "it isn't doing anything" question is answered by that one command.

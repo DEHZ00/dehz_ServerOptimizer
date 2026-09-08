@@ -238,7 +238,67 @@ function diagnose.start()
         end)
     end, false)
 
-    log.info('diagnose', 'console commands: "dehz_status" for a full status and troubleshooting report, "dehz_export" to write a health report now')
+    RegisterCommand('dehz_profile', function(source, args)
+        if source ~= 0 and not Dehz.bridge.isAdmin(source) then return end
+
+        if not Config.Profiler.enabled then
+            log.warn('diagnose', 'the profiler module is disabled. Set Config.Profiler.enabled = true in config.lua.')
+            if source ~= 0 then
+                Dehz.bridge.notify(source, 'The profiler module is disabled in config.lua.', 'error')
+            end
+            return
+        end
+
+        local frames = tonumber(args and args[1])
+        local actor = source == 0 and 'server console' or Dehz.bridge.getPlayerLabel(source)
+
+        local started, reason = Dehz.profiler.run(frames, actor, function(result, err)
+            if not result then
+                log.warn('diagnose', 'profile failed: %s', tostring(err))
+                if source ~= 0 then
+                    Dehz.bridge.notify(source, 'Profile failed: ' .. tostring(err), 'error')
+                end
+                return
+            end
+
+            local lines = {
+                '',
+                ('MEASURED per-resource time - %d frames, %.1fms of server time'):format(result.frames, result.wallMs),
+                ('(a real measurement, not the analyzer\'s estimate. JSON decode took %dms)'):format(result.decodeMs),
+                ''
+            }
+
+            for i = 1, math.min(#result.resources, 20) do
+                local r = result.resources[i]
+                lines[#lines + 1] = ('  %-34s %9.2f ms  %6.2f%%  %5d calls'):format(r.resource, r.ms, r.share, r.calls)
+            end
+
+            if #result.resources == 0 then
+                lines[#lines + 1] = '  nothing was recorded - try more frames'
+            end
+
+            lines[#lines + 1] = ''
+            log.banner(lines)
+
+            if source ~= 0 then
+                Dehz.bridge.notify(source, ('Profile complete: %d resources measured. Results are in the server console.'):format(#result.resources), 'success')
+            end
+        end)
+
+        if started then
+            log.info('diagnose', 'profiler %s - results will print here when it finishes', tostring(reason))
+            if source ~= 0 then
+                Dehz.bridge.notify(source, 'Profiler ' .. tostring(reason) .. '. Results go to the server console.', 'inform')
+            end
+        else
+            log.warn('diagnose', 'profiler did not start: %s', tostring(reason))
+            if source ~= 0 then
+                Dehz.bridge.notify(source, 'Profiler did not start: ' .. tostring(reason), 'error')
+            end
+        end
+    end, false)
+
+    log.info('diagnose', 'console commands: "dehz_status" (status and troubleshooting), "dehz_export" (write a health report), "dehz_profile [frames]" (measure per-resource time)')
 end
 
 Dehz.diagnose = diagnose

@@ -150,6 +150,17 @@ exports('runResourceAnalysis', function()
     return async('runResourceAnalysis', Dehz.analyzer.run, 'export-api')
 end)
 
+exports('runProfile', function(frames, actor)
+    if not Config.Profiler.enabled then
+        return false, 'the profiler module is disabled in config.lua'
+    end
+    return Dehz.profiler.run(frames, actor or 'export-api')
+end)
+
+exports('getProfilerStatus', function()
+    return Dehz.profiler.status()
+end)
+
 exports('getProfileReport', function()
     return Dehz.profiler.report()
 end)
