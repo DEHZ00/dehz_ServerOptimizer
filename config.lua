@@ -729,6 +729,16 @@ Config.Network = {
 --
 --  Everything here is deliberately conservative.
 -- ---------------------------------------------------------------------
+--  ONE EXTRA STEP IS REQUIRED. The profiler works by driving the FiveM
+--  server's own "profiler" console command, and the server refuses that
+--  command to resources unless you allow it. Add this to server.cfg,
+--  using your actual resource folder name, and restart:
+--
+--      add_ace resource.dehz_ServerOptimizer command.profiler allow
+--
+--  Without it every profile run fails with "Access denied for command
+--  profiler". The resource checks this at startup and tells you.
+-- ---------------------------------------------------------------------
 Config.Profiler = {
     enabled = true,
 

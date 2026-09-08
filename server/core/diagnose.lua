@@ -150,7 +150,14 @@ function diagnose.report()
     end
 
     local prof = Dehz.profiler.status()
-    line('  profiler    %s', prof.enabled and (prof.running and ('running: ' .. prof.stage) or 'enabled, idle') or 'disabled in config')
+    if not prof.enabled then
+        line('  profiler    disabled in config')
+    elseif prof.aceGranted == false then
+        line('  profiler    ENABLED BUT BLOCKED - the server denies this resource the "profiler" console command')
+        line('              add to server.cfg and restart:  %s', tostring(prof.aceLine))
+    else
+        line('  profiler    %s', prof.running and ('running: ' .. prof.stage) or 'enabled, idle')
+    end
 
     line('')
     line('OUTPUT FILES')
